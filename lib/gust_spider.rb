@@ -36,7 +36,8 @@ class GustSpider < Kimurai::Base
 
   def parse_company_page(response, url:, data: {})
     logger.debug "Parsing #{ data[:name] } at #{ data[:href] }"
-    company = fetch_company(response).merge(parsed_at: Time.now,
+    company = fetch_company(response).merge(href: data[:href],
+                                            parsed_at: Time.now,
                                             users: fetch_users(response))
     Publisher.publish('companies', company)
   end
