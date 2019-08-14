@@ -1,6 +1,6 @@
 FROM ruby:2.6.3
 
-RUN apt-get update -qq && apt-get install -q -y lsof unzip wget tar openssl xvfb chromium
+RUN apt-get update -qq && apt-get install -q -y netcat lsof unzip wget tar openssl xvfb chromium
 
 RUN cd /tmp && \
     wget https://chromedriver.storage.googleapis.com/2.44/chromedriver_linux64.zip && \
@@ -18,4 +18,9 @@ RUN bundle install
 
 COPY . /app
 
-CMD ["ruby", "app.rb"]
+COPY gust-entrypoint.sh /usr/bin/
+RUN chmod +x /usr/bin/gust-entrypoint.sh
+ENTRYPOINT ["gust-entrypoint.sh"]
+
+#CMD ["ruby", "app.rb"]
+CMD ["tail", "-f", "/dev/null"]

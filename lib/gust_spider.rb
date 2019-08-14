@@ -1,4 +1,5 @@
 class GustSpider < Kimurai::Base
+  @@redis = Redis.new(host: "redis", port: 6379)
   @name = "gust_spider"
   @engine = :selenium_chrome
   @start_urls = ["https://gust.com/search/new?category=startups&page=1&partial=results"]
@@ -7,9 +8,17 @@ class GustSpider < Kimurai::Base
       before_request: { delay: 1..3 }
   }
 
-  # TODO: redis state: current_page/status
-
   def parse(response, url:, data: {})
+    current_page = /page=(\d+)/.match(url)[1].to_i
+    if current_page == 2 # == last_page
+      @@redis.set('gust.state', 'finished')
+      Publisher.connection.close
+      return
+    end
+
+    @@redis.set('gust.state', 'processing')
+    @@redis.set('gust.page', current_page)
+
     response.xpath("//div[@id='search_results']//li[@class='list-group-item']//div[@class='card-title']/a")
             .each do |company_link|
 
@@ -20,22 +29,16 @@ class GustSpider < Kimurai::Base
     end
 
 
-    index = /page=(\d+)/.match(url)[1].to_i
-    return if index == 2
 
     next_page = response.at_xpath("//div[@id='search_results']//li[@class='last']/a")
     request_to :parse, url: absolute_url(next_page[:href], base: url) if next_page
   end
 
   def parse_company_page(response, url:, data: {})
-    logger.debug "=========="
     logger.debug "Parsing #{ data[:name] } at #{ data[:href] }"
-
     company = fetch_company(response).merge(parsed_at: Time.now,
                                             users: fetch_users(response))
-
-    logger.debug company.to_s
-    logger.debug "=========="
+    Publisher.publish('companies', company)
   end
 
   private
